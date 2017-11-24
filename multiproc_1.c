@@ -7,88 +7,22 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
-#include <errno.h>          /* errno, ECHILD            */
 #include "util.h"
 
-/* We must define union semun ourselves.  */
-
-union semun {
-  int val;
-  struct semid_ds *buf;
-  unsigned short int *array;
-  struct seminfo *__buf;
-};
-
-/* Obtain a binary semaphore's ID, allocating if necessary.  */
-
-int binary_semaphore_allocation (key_t key, int sem_flags)
-{
-  return semget (key, 1, sem_flags);
-}
-
-/* Deallocate a binary semaphore.  All users must have finished their
-   use.  Returns -1 on failure.  */
-
-int binary_semaphore_deallocate (int semid)
-{
-  union semun ignored_argument;
-  return semctl (semid, 1, IPC_RMID, ignored_argument);
-}
-
-/* Initialize a binary semaphore with a value of one.  */
-
-int binary_semaphore_initialize (int semid)
-{
-  union semun argument;
-  unsigned short values[1];
-  values[0] = 1;
-  argument.array = values;
-  return semctl (semid, 0, SETALL, argument);
-}
-
-/* Wait on a binary semaphore.  Block until the semaphore value is
-   positive, then decrement it by one.  */
-
-int binary_semaphore_wait (int semid)
-{
-  struct sembuf operations[1];
-  /* Use the first (and only) semaphore.  */
-  operations[0].sem_num = 0;
-  /* Decrement by 1.  */
-  operations[0].sem_op = -1;
-  /* Permit undo'ing.  */
-  operations[0].sem_flg = SEM_UNDO;
-
-  return semop (semid, operations, 1);
-}
-
-/* Post to a binary semaphore: increment its value by one.  This
-   returns immediately.  */
-
-int binary_semaphore_post (int semid)
-{
-  struct sembuf operations[1];
-  /* Use the first (and only) semaphore.  */
-  operations[0].sem_num = 0;
-  /* Increment by 1.  */
-  operations[0].sem_op = 1;
-  /* Permit undo'ing.  */
-  operations[0].sem_flg = SEM_UNDO;
-
-  return semop (semid, operations, 1);
-}
-
+int create_mutex(key_t key, int sem_flags);
+int destroy_mutex(int sid);
+int mutex_up(int sid);
+int mutex_down (int sid);
 
 int main(int argc, char *argv[])
 {
-	int done = 0;
+	int done = 0; //each process must print only one argument, rep times
 
 	int n_strings = argc - 2; //number of given strings
 
 	if (n_strings >= 1)
 	{
-		int mut = binary_semaphore_allocation(IPC_PRIVATE, 0600);
-		binary_semaphore_initialize(mut);
+		int mut = create_mutex(IPC_PRIVATE, 0600);
 
 		int rep = atoi(argv[1]);
 		argv = argv + 2;
@@ -104,9 +38,9 @@ int main(int argc, char *argv[])
 				{
 					for (int j = 0; j < rep; j++)
 					{
-						binary_semaphore_wait(mut);
+						mutex_down(mut); //wait
 						display(argv[i]);
-						binary_semaphore_post(mut);
+						mutex_up(mut); //post
 					}
 					done = 1;
 				}
@@ -114,17 +48,50 @@ int main(int argc, char *argv[])
 
 		}
 
-		pid_t child_pid, wpid;
+		pid_t wpid;
 		int status = 0;
-
 		while ((wpid = wait(&status)) > 0);
 
-		if (pid > 0)
-		{
-			binary_semaphore_deallocate(mut);
-		}
-
+		if (pid > 0) destroy_mutex(mut);
 	}
 
 	return 0;
+}
+
+typedef union
+{
+	int val;    /* Value for SETVAL */
+	struct semid_ds *buf;    /* Buffer for IPC_STAT, IPC_SET */
+	unsigned short *array;  /* Array for GETALL, SETALL */
+	struct seminfo *__buf;  /* Buffer for IPC_INFO (Linux-specific) */
+}semun_t;
+
+int create_mutex(key_t key, int sem_flags)
+{
+	int sem_id = semget(key, 1, sem_flags);
+	semun_t mutex_union;
+	unsigned short value[1];
+	value[0]=1;
+	mutex_union.array = value;
+	semctl (sem_id, 0, SETALL, mutex_union);
+	return sem_id;
+}
+
+int destroy_mutex(int sid)
+{
+    return semctl(sid, 1, IPC_RMID);
+}
+
+int mutex_up(int sid)
+{
+    //increment and wake a waiting process (if any)
+    struct sembuf up = {0, 1, 0};
+    return semop(sid, &up, 1);
+}
+
+int mutex_down (int sid)
+{
+    //decrement and block if the result is negative
+    struct sembuf down = {0, -1, 0};
+    return semop(sid, &down, 1);
 }
