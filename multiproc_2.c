@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 
 	if (n_strings >= 1)
 	{
-		int mut = create_binary_semaphore(IPC_PRIVATE, 0600);
+		int lock = create_binary_semaphore(IPC_PRIVATE, 0600);
 
 		int rep = atoi(argv[1]);
 		argv = argv + 2;
@@ -37,17 +37,17 @@ int main(int argc, char *argv[])
 				if (pid == 0)
 				{
 
-					decrement(mut);
+					decrement(lock);
 					init();
-					increment(mut);
+					increment(lock);
 
 					for (int j = 0; j < rep; j++)
 					{
-						decrement(mut); //and block if the result is negative (meaning that another process "has" the semaphore)
+						decrement(lock); //and block if the result is negative (meaning that another process "has" the semaphore)
 						//start-of-critical-region
 						display(argv[i]);
 						//end-of-critical-region
-						increment(mut); //and wake a waiting process (if any)
+						increment(lock); //and wake a waiting process (if any)
 					}
 					done = 1;
 				}
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 		int status = 0;
 		while ((wpid = wait(&status)) > 0);
 
-		if (pid > 0) destroy_binary_semaphore(mut);
+		if (pid > 0) destroy_binary_semaphore(lock);
 	}
 
 	return 0;
