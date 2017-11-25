@@ -9,10 +9,10 @@
 #include <sys/shm.h>
 #include "util.h"
 
-int create_mutex(key_t key, int sem_flags);
-int destroy_mutex(int sid);
-int mutex_up(int sid);
-int mutex_down (int sid);
+int create_binary_semaphore(key_t key, int sem_flags);
+int destroy_binary_semaphore(int sem_id);
+int increment(int sem_id);
+int decrement(int sem_id);
 
 int main(int argc, char *argv[])
 {
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 
 	if (n_strings >= 1)
 	{
-		int mut = create_mutex(IPC_PRIVATE, 0600);
+		int mut = create_binary_semaphore(IPC_PRIVATE, 0600);
 
 		int rep = atoi(argv[1]);
 		argv = argv + 2;
@@ -38,21 +38,22 @@ int main(int argc, char *argv[])
 				{
 					for (int j = 0; j < rep; j++)
 					{
-						mutex_down(mut); //wait
+						decrement(mut); //and block if the result is negative (meaning that another process "has" the semaphore)
+						//start-of-critical-region
 						display(argv[i]);
-						mutex_up(mut); //post
+						//end-of-critical-region
+						increment(mut); //and wake a waiting process (if any)
 					}
 					done = 1;
 				}
 			}
-
 		}
 
 		pid_t wpid;
 		int status = 0;
 		while ((wpid = wait(&status)) > 0);
 
-		if (pid > 0) destroy_mutex(mut);
+		if (pid > 0) destroy_binary_semaphore(mut);
 	}
 
 	return 0;
@@ -66,7 +67,7 @@ typedef union
 	struct seminfo *__buf;  /* Buffer for IPC_INFO (Linux-specific) */
 }semun_t;
 
-int create_mutex(key_t key, int sem_flags)
+int create_binary_semaphore(key_t key, int sem_flags)
 {
 	int sem_id = semget(key, 1, sem_flags);
 	semun_t mutex_union;
@@ -77,21 +78,21 @@ int create_mutex(key_t key, int sem_flags)
 	return sem_id;
 }
 
-int destroy_mutex(int sid)
+int destroy_binary_semaphore(int sem_id)
 {
-    return semctl(sid, 1, IPC_RMID);
+    return semctl(sem_id, 1, IPC_RMID);
 }
 
-int mutex_up(int sid)
+int increment(int sem_id)
 {
     //increment and wake a waiting process (if any)
     struct sembuf up = {0, 1, 0};
-    return semop(sid, &up, 1);
+    return semop(sem_id, &up, 1);
 }
 
-int mutex_down (int sid)
+int decrement(int sem_id)
 {
     //decrement and block if the result is negative
     struct sembuf down = {0, -1, 0};
-    return semop(sid, &down, 1);
+    return semop(sem_id, &down, 1);
 }
