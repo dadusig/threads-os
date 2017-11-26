@@ -74,7 +74,7 @@ int create_binary_semaphore(key_t key, int sem_flags)
 	unsigned short value[1];
 	value[0]=1;
 	mutex_union.array = value;
-	semctl (sem_id, 0, SETALL, mutex_union);
+	semctl(sem_id, 0, SETALL, mutex_union);
 	return sem_id;
 }
 
