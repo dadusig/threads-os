@@ -7,7 +7,6 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
-#include <sys/stat.h>
 #include "util.h"
 
 int create_binary_semaphore(key_t key, int sem_flags);
@@ -15,22 +14,15 @@ int destroy_binary_semaphore(int sem_id);
 int increment(int sem_id);
 int decrement(int sem_id);
 
-
 int main(int argc, char *argv[])
 {
 	int done = 0; //each process must print only one argument, rep times
 
 	int n_strings = argc - 2; //number of given strings
-	
-	int shm_id = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0666);
-	int *counter = shmat(shm_id, 0, 0);
-
-	int barrier = semget(IPC_PRIVATE, 1, 0600);	
 
 	if (n_strings >= 1)
 	{
 		int lock = create_binary_semaphore(IPC_PRIVATE, 0600);
-		int lock2 = create_binary_semaphore(IPC_PRIVATE, 0600);
 
 		int rep = atoi(argv[1]);
 		argv = argv + 2;
@@ -44,18 +36,10 @@ int main(int argc, char *argv[])
 				pid = fork();
 				if (pid == 0)
 				{
+
+					decrement(lock);
 					init();
-
-					decrement(lock2);
-					*counter=*counter+1;
-					increment(lock2);
-
-					if (*counter == n_strings)
-						increment(barrier);
-
-					decrement(barrier);
-					increment(barrier);
-					
+					increment(lock);
 
 					for (int j = 0; j < rep; j++)
 					{
@@ -74,15 +58,7 @@ int main(int argc, char *argv[])
 		int status = 0;
 		while ((wpid = wait(&status)) > 0);
 
-		if (pid > 0) 
-		{
-		destroy_binary_semaphore(lock);
-		destroy_binary_semaphore(lock2);
-		/* detach shared memory segment */  
-		shmdt(&shm_id);  
-		/* remove shared memory segment */  
-		shmctl(shm_id, IPC_RMID, NULL);
-		}
+		if (pid > 0) destroy_binary_semaphore(lock);
 	}
 
 	return 0;
