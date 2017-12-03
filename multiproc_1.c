@@ -9,8 +9,8 @@
 #include <sys/shm.h>
 #include "util.h"
 
-int create_binary_semaphore(key_t key, int sem_flags);
-int destroy_binary_semaphore(int sem_id);
+int create_semaphore(key_t key, int sem_flags, int init_value);
+int destroy_semaphore(int sem_id);
 int increment(int sem_id);
 int decrement(int sem_id);
 
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 
 	if (n_strings >= 1)
 	{
-		int lock = create_binary_semaphore(IPC_PRIVATE, 0600);
+		int lock = create_semaphore(IPC_PRIVATE, 0600, 1);
 
 		int rep = atoi(argv[1]);
 		argv = argv + 2;
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 		int status = 0;
 		while ((wpid = wait(&status)) > 0);
 
-		if (pid > 0) destroy_binary_semaphore(lock);
+		if (pid > 0) destroy_semaphore(lock);
 	}
 
 	return 0;
@@ -67,18 +67,18 @@ typedef union
 	struct seminfo *__buf;  /* Buffer for IPC_INFO (Linux-specific) */
 }semun_t;
 
-int create_binary_semaphore(key_t key, int sem_flags)
+int create_semaphore(key_t key, int sem_flags, int init_value)
 {
 	int sem_id = semget(key, 1, sem_flags);
 	semun_t mutex_union;
 	unsigned short value[1];
-	value[0]=1;
+	value[0]=init_value;
 	mutex_union.array = value;
 	semctl(sem_id, 0, SETALL, mutex_union);
 	return sem_id;
 }
 
-int destroy_binary_semaphore(int sem_id)
+int destroy_semaphore(int sem_id)
 {
     return semctl(sem_id, 1, IPC_RMID);
 }
