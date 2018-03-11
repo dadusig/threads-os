@@ -1,6 +1,6 @@
-#  Process and Threads Synchronization
+#  Process and Threads Synchronization ![semester](https://img.shields.io/badge/Winter%20Semester-2017--2018-green.svg)
 
-3rd assignment of Operating Systems course, taught in Spring Semester of 2017-2018.
+3rd assignment of **Operating Systems** course, taught in Winter Semester of 2017-2018.
 
 In order to understand the file structure and for a detailed review of the project, please read report/report.pdf (in greek)
 
@@ -10,7 +10,7 @@ In order to understand the file structure and for a detailed review of the proje
 * Process Synchronization using counting semaphores
 
 **Multithread synchronization (multithread_{1,2}.c)**:
-* Creation of multiple threads with diffrent parameters
+* Creation of multiple threads with different parameters
 * Mutual exclusion using mutex locks
 * Thread synchronization using barriers
 
